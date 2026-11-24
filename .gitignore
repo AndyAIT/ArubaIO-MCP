@@ -1,1 +1,15 @@
 reference/*.ps1
+.aider*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Secrets
+.env
+.env.*
+
+# Local development
+prompt.txt
+reference/*.ps1
