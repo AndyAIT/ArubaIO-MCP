@@ -4,6 +4,9 @@ import base64
 import hashlib
 import hmac
 from urllib.parse import urlparse, parse_qs
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class ArubaInstantOnClient:
     def __init__(self):
@@ -74,14 +77,32 @@ class ArubaInstantOnClient:
 
         token = token_response.json()
         self.access_token = token['access_token']
+      
 
     def get_access_token(self):
         if not self.access_token:
             self.authenticate()
         return self.access_token
 
+    def list_sites(self):
+        headers = {
+            "Authorization": f"Bearer {self.get_access_token()}",
+            "x-ion-api-version": "7"
+        }
+
+        response = self.session.get(
+            "https://nb.portal.arubainstanton.com/api/sites/",
+            headers=headers
+        )
+        response.raise_for_status()
+
+        return response.json()["elements"]
+
 # Example usage
 if __name__ == "__main__":
     client = ArubaInstantOnClient()
-    access_token = client.get_access_token()
-    print("Authentication successful")
+
+    sites = client.list_sites()
+
+    for site in sites:
+        print(f"Site Name: {site['name']}, Site ID: {site['id']}")
