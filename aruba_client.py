@@ -98,11 +98,44 @@ class ArubaInstantOnClient:
 
         return response.json()["elements"]
 
-# Example usage
-if __name__ == "__main__":
-    client = ArubaInstantOnClient()
+    def list_devices(self, site_id):
+        headers = {
+            "Authorization": f"Bearer {self.get_access_token()}",
+            "x-ion-api-version": "7"
+        }
 
-    sites = client.list_sites()
+        response = self.session.get(
+            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}/inventory",
+            headers=headers
+        )
+        response.raise_for_status()
 
-    for site in sites:
-        print(f"Site Name: {site['name']}, Site ID: {site['id']}")
+        return response.json()["elements"]
+
+    def list_clients(self, site_id):
+        headers = {
+            "Authorization": f"Bearer {self.get_access_token()}",
+            "x-ion-api-version": "7"
+        }
+
+        response = self.session.get(
+            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}/clientSummary",
+            headers=headers
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def get_site_details(self, site_id):
+        headers = {
+            "Authorization": f"Bearer {self.get_access_token()}",
+            "x-ion-api-version": "7"
+        }
+
+        response = self.session.get(
+            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}",
+            headers=headers
+        )
+        response.raise_for_status()
+
+        return response.json()
