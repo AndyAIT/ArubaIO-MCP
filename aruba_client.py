@@ -13,7 +13,7 @@ class ArubaInstantOnClient:
         self.base_url = "https://sso.arubainstanton.com"
         self.client_id = None
         self.access_token = None
-        self.session = httpx.Client()
+        self.session = httpx.Client(timeout=30.0)
 
     def get_urlecode(self, bytes_data):
         encoded_text = base64.urlsafe_b64encode(bytes_data).rstrip(b'=').decode('utf-8')
@@ -98,7 +98,43 @@ class ArubaInstantOnClient:
 
         return response.json()["elements"]
 
-    def list_devices(self, site_id):
+    def resolve_site_id(self, site_identifier: str):
+        sites = self.list_sites()
+        exact_matches = [site for site in sites if site['id'] == site_identifier]
+        if exact_matches:
+            return exact_matches[0]['id']
+
+        case_insensitive_matches = [site for site in sites if site['name'].strip().lower() == site_identifier.strip().lower()]
+        if case_insensitive_matches:
+            if len(case_insensitive_matches) > 1:
+                raise ValueError(f"Multiple sites match the name '{site_identifier}': {', '.join(site['name'] for site in case_insensitive_matches)}")
+            return case_insensitive_matches[0]['id']
+
+        partial_matches = [site for site in sites if site['name'].strip().lower().startswith(site_identifier.strip().lower())]
+        if partial_matches:
+            if len(partial_matches) > 1:
+                raise ValueError(f"Multiple sites match the name '{site_identifier}': {', '.join(site['name'] for site in partial_matches)}")
+            return partial_matches[0]['id']
+
+        raise ValueError(f"No site found with identifier '{site_identifier}'")
+
+    def get_site_details(self, site_identifier: str):
+        site_id = self.resolve_site_id(site_identifier)
+        headers = {
+            "Authorization": f"Bearer {self.get_access_token()}",
+            "x-ion-api-version": "7"
+        }
+
+        response = self.session.get(
+            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}",
+            headers=headers
+        )
+        response.raise_for_status()
+
+        return response.json()
+
+    def list_devices(self, site_identifier: str):
+        site_id = self.resolve_site_id(site_identifier)
         headers = {
             "Authorization": f"Bearer {self.get_access_token()}",
             "x-ion-api-version": "7"
@@ -112,7 +148,8 @@ class ArubaInstantOnClient:
 
         return response.json()["elements"]
 
-    def list_clients(self, site_id):
+    def list_clients(self, site_identifier: str):
+        site_id = self.resolve_site_id(site_identifier)
         headers = {
             "Authorization": f"Bearer {self.get_access_token()}",
             "x-ion-api-version": "7"
@@ -120,20 +157,6 @@ class ArubaInstantOnClient:
 
         response = self.session.get(
             f"https://nb.portal.arubainstanton.com/api/sites/{site_id}/clientSummary",
-            headers=headers
-        )
-        response.raise_for_status()
-
-        return response.json()
-
-    def get_site_details(self, site_id):
-        headers = {
-            "Authorization": f"Bearer {self.get_access_token()}",
-            "x-ion-api-version": "7"
-        }
-
-        response = self.session.get(
-            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}",
             headers=headers
         )
         response.raise_for_status()
