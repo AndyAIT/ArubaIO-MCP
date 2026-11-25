@@ -154,6 +154,12 @@ class ArubaInstantOnClient:
         site_id = self.resolve_site_id(site_identifier)
         return self._get(f"/api/sites/{site_id}/inventory")["elements"]
 
+    def get_site_resource(self, site_identifier: str, resource: str, list_result: bool = False):
+        """Fetch a /api/sites/{id}/{resource} endpoint, returning its 'elements' for list endpoints."""
+        site_id = self.resolve_site_id(site_identifier)
+        data = self._get(f"/api/sites/{site_id}/{resource}")
+        return data["elements"] if list_result else data
+
     def list_clients(self, site_identifier: str, client_type: str | None = None):
         """List clients at a site, optionally filtered to 'wired' or 'wireless'."""
         site_id = self.resolve_site_id(site_identifier)
