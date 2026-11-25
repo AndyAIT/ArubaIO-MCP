@@ -2,17 +2,23 @@ import os
 import httpx
 import base64
 import hashlib
-import hmac
+import time
 from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
 
 load_dotenv()
+
+API_BASE_URL = "https://nb.portal.arubainstanton.com"
+TOKEN_EXPIRY_MARGIN = 60
+SITES_CACHE_TTL = 60
 
 class ArubaInstantOnClient:
     def __init__(self):
         self.base_url = "https://sso.arubainstanton.com"
         self.client_id = None
         self.access_token = None
+        self.token_expires_at = 0.0
+        self._sites_cache = None
         self.session = httpx.Client(timeout=30.0)
 
     def get_urlecode(self, bytes_data):
@@ -77,29 +83,51 @@ class ArubaInstantOnClient:
 
         token = token_response.json()
         self.access_token = token['access_token']
-      
+        self.token_expires_at = time.monotonic() + token.get('expires_in', 300) - TOKEN_EXPIRY_MARGIN
 
     def get_access_token(self):
-        if not self.access_token:
+        if not self.access_token or time.monotonic() >= self.token_expires_at:
             self.authenticate()
         return self.access_token
 
+    def _get(self, path: str):
+        """GET an API path, re-authenticating once if the token was rejected."""
+        for attempt in range(2):
+            response = self.session.get(
+                f"{API_BASE_URL}{path}",
+                headers={
+                    "Authorization": f"Bearer {self.get_access_token()}",
+                    "x-ion-api-version": "7"
+                }
+            )
+            if response.status_code == 401 and attempt == 0:
+                self.access_token = None
+                continue
+            response.raise_for_status()
+            return response.json()
+
     def list_sites(self):
-        headers = {
-            "Authorization": f"Bearer {self.get_access_token()}",
-            "x-ion-api-version": "7"
-        }
+        sites = self._get("/api/sites/")["elements"]
+        self._sites_cache = (time.monotonic(), sites)
+        return sites
 
-        response = self.session.get(
-            "https://nb.portal.arubainstanton.com/api/sites/",
-            headers=headers
-        )
-        response.raise_for_status()
-
-        return response.json()["elements"]
+    def _cached_sites(self, force_refresh: bool = False):
+        if not force_refresh and self._sites_cache:
+            fetched_at, sites = self._sites_cache
+            if time.monotonic() - fetched_at < SITES_CACHE_TTL:
+                return sites
+        return self.list_sites()
 
     def resolve_site_id(self, site_identifier: str):
-        sites = self.list_sites()
+        try:
+            return self._resolve_site_id(site_identifier, self._cached_sites())
+        except ValueError as error:
+            if "No site found" not in str(error):
+                raise
+        # A miss may just mean the cache is stale, so retry against fresh data.
+        return self._resolve_site_id(site_identifier, self._cached_sites(force_refresh=True))
+
+    def _resolve_site_id(self, site_identifier: str, sites: list):
         exact_matches = [site for site in sites if site['id'] == site_identifier]
         if exact_matches:
             return exact_matches[0]['id']
@@ -120,45 +148,16 @@ class ArubaInstantOnClient:
 
     def get_site_details(self, site_identifier: str):
         site_id = self.resolve_site_id(site_identifier)
-        headers = {
-            "Authorization": f"Bearer {self.get_access_token()}",
-            "x-ion-api-version": "7"
-        }
-
-        response = self.session.get(
-            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}",
-            headers=headers
-        )
-        response.raise_for_status()
-
-        return response.json()
+        return self._get(f"/api/sites/{site_id}")
 
     def list_devices(self, site_identifier: str):
         site_id = self.resolve_site_id(site_identifier)
-        headers = {
-            "Authorization": f"Bearer {self.get_access_token()}",
-            "x-ion-api-version": "7"
-        }
+        return self._get(f"/api/sites/{site_id}/inventory")["elements"]
 
-        response = self.session.get(
-            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}/inventory",
-            headers=headers
-        )
-        response.raise_for_status()
-
-        return response.json()["elements"]
-
-    def list_clients(self, site_identifier: str):
+    def list_clients(self, site_identifier: str, client_type: str | None = None):
+        """List clients at a site, optionally filtered to 'wired' or 'wireless'."""
         site_id = self.resolve_site_id(site_identifier)
-        headers = {
-            "Authorization": f"Bearer {self.get_access_token()}",
-            "x-ion-api-version": "7"
-        }
-
-        response = self.session.get(
-            f"https://nb.portal.arubainstanton.com/api/sites/{site_id}/clientSummary",
-            headers=headers
-        )
-        response.raise_for_status()
-
-        return response.json()
+        clients = self._get(f"/api/sites/{site_id}/clientSummary")["elements"]
+        if client_type:
+            clients = [client for client in clients if client.get("clientType") == client_type]
+        return clients

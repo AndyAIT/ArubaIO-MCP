@@ -27,7 +27,7 @@ def aruba_list_devices(site_identifier: str) -> list:
 
 
 @mcp.tool()
-def aruba_list_clients(site_identifier: str) -> dict:
+def aruba_list_clients(site_identifier: str) -> list:
     """List all wired and wireless clients at an Aruba Instant On site. Site identifier can be a UUID or name."""
     return client.list_clients(site_identifier)
 
@@ -35,13 +35,13 @@ def aruba_list_clients(site_identifier: str) -> dict:
 @mcp.tool()
 def aruba_list_wired_clients(site_identifier: str) -> list:
     """List wired clients connected to an Aruba Instant On site. Site identifier can be a UUID or name."""
-    return client.list_clients(site_identifier)
+    return client.list_clients(site_identifier, client_type="wired")
 
 
 @mcp.tool()
 def aruba_list_wireless_clients(site_identifier: str) -> list:
     """List wireless clients connected to an Aruba Instant On site. Site identifier can be a UUID or name."""
-    return client.list_clients(site_identifier)
+    return client.list_clients(site_identifier, client_type="wireless")
 
 
 if __name__ == "__main__":
