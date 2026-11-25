@@ -54,8 +54,8 @@ OAuth 2.0 is not needed. This server uses a static bearer token.
 In the test pane, try:
 
 - "List all Aruba sites."
-- "How many wireless clients are on Fabrikam?"
-- "Any active alerts at Contoso IT?"
+- "How many wireless clients are on Contoso?"
+- "Any active alerts at Fabrikam?"
 
 If a call fails, check the tool details in the test pane for the error.
 
