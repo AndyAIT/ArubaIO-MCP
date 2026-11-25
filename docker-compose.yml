@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
 
     env_file:
-      - .env
+      - .env   # ARUBA_USERNAME, ARUBA_PASSWORD, MCP_AUTH_TOKEN
 
     ports:
       - "127.0.0.1:8830:8830"

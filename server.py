@@ -1,8 +1,25 @@
+import os
+import sys
+
 from fastmcp import FastMCP
+from fastmcp.server.auth import StaticTokenVerifier
 from aruba_client import ArubaInstantOnClient
 
+TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
+AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN")
+
+# Over HTTP the server must be protected by a bearer token; stdio is local-only.
+if TRANSPORT != "stdio" and not AUTH_TOKEN:
+    sys.exit("MCP_AUTH_TOKEN must be set when MCP_TRANSPORT is not 'stdio'")
+
+auth = (
+    StaticTokenVerifier(tokens={AUTH_TOKEN: {"client_id": "aruba-mcp-client", "scopes": []}})
+    if TRANSPORT != "stdio"
+    else None
+)
+
 # Initialize FastMCP
-mcp = FastMCP("Aruba Instant On MCP")
+mcp = FastMCP("Aruba Instant On MCP", auth=auth)
 
 # Initialize Aruba API client
 client = ArubaInstantOnClient()
@@ -99,4 +116,11 @@ def aruba_list_wired_networks(site_identifier: str) -> list:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    if TRANSPORT == "stdio":
+        mcp.run()
+    else:
+        mcp.run(
+            transport=TRANSPORT,
+            host=os.getenv("MCP_HTTP_HOST", "0.0.0.0"),
+            port=int(os.getenv("MCP_HTTP_PORT", "8830")),
+        )

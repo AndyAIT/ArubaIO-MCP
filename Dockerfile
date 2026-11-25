@@ -1,24 +1,23 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+FROM python:3.13-slim
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir fastmcp httpx python-dotenv
+COPY aruba_client.py server.py ./
 
-# Create a non-root user
 RUN useradd -m appuser
 USER appuser
 
-# Expose the port the app runs on
+ENV MCP_TRANSPORT=streamable-http \
+    MCP_HTTP_HOST=0.0.0.0 \
+    MCP_HTTP_PORT=8830
+
 EXPOSE 8830
 
-# Define environment variable file
-ENV_FILE=.env
+# A TCP connect is enough: the endpoint itself requires the bearer token.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import os,socket; socket.create_connection(('127.0.0.1', int(os.environ['MCP_HTTP_PORT'])), 3)"]
 
-# Run the app when the container launches
 CMD ["python", "server.py"]
