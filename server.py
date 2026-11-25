@@ -12,6 +12,22 @@ AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN")
 if TRANSPORT != "stdio" and not AUTH_TOKEN:
     sys.exit("MCP_AUTH_TOKEN must be set when MCP_TRANSPORT is not 'stdio'")
 
+REDACT_SECRETS = os.getenv("MCP_REDACT_SECRETS", "true").lower() not in ("false", "0", "no")
+SECRET_KEYS = {"presharedkey", "password", "passphrase"}
+
+
+def redact_secrets(data):
+    """Replace Wi-Fi pre-shared keys and similar secrets with a placeholder."""
+    if isinstance(data, dict):
+        return {
+            k: "***REDACTED***" if k.lower() in SECRET_KEYS and v else redact_secrets(v)
+            for k, v in data.items()
+        }
+    if isinstance(data, list):
+        return [redact_secrets(i) for i in data]
+    return data
+
+
 auth = (
     StaticTokenVerifier(tokens={AUTH_TOKEN: {"client_id": "aruba-mcp-client", "scopes": []}})
     if TRANSPORT != "stdio"
@@ -105,8 +121,9 @@ def aruba_get_application_usage(site_identifier: str) -> list:
 
 @mcp.tool()
 def aruba_list_wireless_networks(site_identifier: str) -> list:
-    """List wireless networks (SSIDs) at an Aruba Instant On site, including security settings and pre-shared keys. Site identifier can be a UUID or name."""
-    return client.get_site_resource(site_identifier, "networksSummary", list_result=True)
+    """List wireless networks (SSIDs) at an Aruba Instant On site, including security settings. Pre-shared keys are redacted unless MCP_REDACT_SECRETS=false. Site identifier can be a UUID or name."""
+    networks = client.get_site_resource(site_identifier, "networksSummary", list_result=True)
+    return redact_secrets(networks) if REDACT_SECRETS else networks
 
 
 @mcp.tool()
