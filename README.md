@@ -118,6 +118,8 @@ To run it beside other services, for example a `cloudflared` tunnel, add a servi
 
 Point the tunnel's public hostname at `http://aruba-mcp:8830`. Keep the bearer token enabled whenever the service is reachable from the internet.
 
+To use the server from a Microsoft Copilot Studio agent, see [docs/copilot-studio.md](docs/copilot-studio.md).
+
 ## Verifying it works
 
 ```bash
