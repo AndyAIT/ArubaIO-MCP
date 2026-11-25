@@ -1,0 +1,11 @@
+services:
+  aruba-mcp:
+    build: .
+    container_name: arubaio-mcp
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "127.0.0.1:8830:8830"
